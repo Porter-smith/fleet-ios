@@ -65,13 +65,15 @@ final class ScreenshotTests: XCTestCase {
         more.tap()
         sleep(1)
         snap("04-composer-actions")
-        // Close the menu by tapping the chat above it.
-        app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.2)).tap()
-        back()
+        // Close the menu with a tap to its right (the menu covers the left of the
+        // screen; a tap there would pick an action), then go back to the list.
+        app.coordinate(withNormalizedOffset: CGVector(dx: 0.92, dy: 0.45)).tap()
+        sleep(1)
+        let plus = element("newRun.open")
+        back(until: plus)
 
         // 5. The new-run sheet.
-        let plus = element("newRun.open")
-        XCTAssertTrue(plus.waitForExistence(timeout: 10))
+        XCTAssertTrue(plus.waitForExistence(timeout: 10), "back should reach the runs list")
         plus.tap()
         let prompt = element("newRun.prompt")
         XCTAssertTrue(prompt.waitForExistence(timeout: 20), "machines with harnesses should load")
@@ -101,6 +103,13 @@ final class ScreenshotTests: XCTestCase {
     private func back() {
         let button = app.navigationBars.buttons.firstMatch
         if button.waitForExistence(timeout: 5) { button.tap() }
+    }
+
+    /// Taps back until `target` shows, a few times at most.
+    private func back(until target: XCUIElement) {
+        for _ in 0..<3 where !target.waitForExistence(timeout: 2) {
+            back()
+        }
     }
 
     private func snap(_ name: String) {
