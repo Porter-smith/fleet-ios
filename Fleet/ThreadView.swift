@@ -106,6 +106,7 @@ struct UserBubble: View {
                 }
             }
         }
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("row.user")
     }
 }

@@ -63,6 +63,7 @@ struct NewRunSheet: View {
             .padding(.horizontal, 14)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(Theme.canvas)
+            .accessibilityElement(children: .contain)
             .accessibilityIdentifier("newRun")
             .navigationTitle("New chat")
             .navigationBarTitleDisplayMode(.inline)
