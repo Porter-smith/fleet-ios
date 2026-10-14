@@ -1,0 +1,59 @@
+: open
+
+event: run
+data: {"id":"r_8713f00693","taskId":null,"attemptId":null,"machineId":"m_claude","harness":"claude","model":"claude-opus-5-5","cwd":"/tmp/fleet-claude-qdfI6q/fleet/repos/fleet-sandbox","branch":null,"sessionId":"5d67be47-8929-4988-ba02-aac93af9c819","remoteDir":"/tmp/fleet-claude-qdfI6q/fleet/runs/r_8713f00693","status":"idle","title":"Deploy the fleet-sandbox preview","origin":"fleet","usageBlock":null,"exitCode":null,"error":null,"createdAt":1791953210398,"updatedAt":1791953210667,"endedAt":null,"turnOpen":false,"queued":0,"costUsd":0.04,"permissionMode":"manual","resumeOf":null,"source":"out","agentLog":null,"retries":0,"effort":null,"continuedWith":null,"holdPermissions":false,"pendingPermission":null,"stats":{"tokens":17,"context":0,"input":0,"output":0,"cacheRead":0,"cacheWrite":0,"toolUses":2,"activity":null,"workedMs":142,"turnStartedAt":null,"lastAt":1791953210667}}
+
+event: event
+data: {"runId":"r_8713f00693","seq":1,"at":1791953210440,"type":"status","agent":null,"data":{"kind":"spawned","text":"Started claude/claude-opus-5-5 (manual) on claude in /tmp/fleet-claude-qdfI6q/fleet/repos/fleet-sandbox"}}
+
+event: event
+data: {"runId":"r_8713f00693","seq":2,"at":1791953210441,"type":"user","agent":null,"data":{"text":"Deploy the preview build of fleet-sandbox","source":"fleet"}}
+
+event: event
+data: {"runId":"r_8713f00693","seq":3,"at":1791953210534,"type":"init","agent":null,"data":{"sessionId":"5d67be47-8929-4988-ba02-aac93af9c819","model":"claude-opus-5-5","cwd":"/tmp/fleet-claude-qdfI6q/fleet/repos/fleet-sandbox","permissionMode":"manual","version":"fake"}}
+
+event: event
+data: {"runId":"r_8713f00693","seq":4,"at":1791953210553,"type":"assistant","agent":null,"data":{"key":"msg_1:0","messageId":"msg_1","model":"claude-opus-5-5","text":"echo: Deploy the preview build of fleet-sandbox"}}
+
+event: event
+data: {"runId":"r_8713f00693","seq":5,"at":1791953210554,"type":"usage","agent":null,"data":{"status":"allowed","window":"five_hour","resetsAt":1791956810000,"overageStatus":"rejected","isUsingOverage":false,"windows":null}}
+
+event: event
+data: {"runId":"r_8713f00693","seq":6,"at":1791953210555,"type":"result","agent":null,"data":{"subtype":"success","isError":false,"sessionId":"5d67be47-8929-4988-ba02-aac93af9c819","costUsd":0.001,"costCumulative":true,"durationMs":10,"turns":1,"input":0,"output":0,"cacheRead":0,"denied":[],"text":"echo: Deploy the preview build of fleet-sandbox","errors":[],"apiErrorStatus":null,"terminalReason":"completed"}}
+
+event: event
+data: {"runId":"r_8713f00693","seq":7,"at":1791953210602,"type":"user","agent":null,"data":{"text":"go ahead","source":"fleet"}}
+
+event: event
+data: {"runId":"r_8713f00693","seq":8,"at":1791953210625,"type":"assistant","agent":null,"data":{"key":"msg_2:0","messageId":"msg_2","model":"claude-opus-5-5","text":"echo: go ahead"}}
+
+event: event
+data: {"runId":"r_8713f00693","seq":9,"at":1791953210626,"type":"usage","agent":null,"data":{"status":"allowed","window":"five_hour","resetsAt":1791956810000,"overageStatus":"rejected","isUsingOverage":false,"windows":null}}
+
+event: event
+data: {"runId":"r_8713f00693","seq":10,"at":1791953210626,"type":"result","agent":null,"data":{"subtype":"success","isError":false,"sessionId":"5d67be47-8929-4988-ba02-aac93af9c819","costUsd":0.002,"costCumulative":true,"durationMs":10,"turns":1,"input":0,"output":0,"cacheRead":0,"denied":[],"text":"echo: go ahead","errors":[],"apiErrorStatus":null,"terminalReason":"completed"}}
+
+event: event
+data: {"runId":"r_8713f00693","seq":11,"at":1791953210662,"type":"tool_use","agent":null,"data":{"key":"tool:toolu_agent_check","id":"toolu_agent_check","name":"Agent","summary":"Check the preview config","detail":"{\n  \"description\": \"Check the preview config\",\n  \"subagent_type\": \"Explore\",\n  \"prompt\": \"Check fleet-sandbox deploy/preview.toml is ready to deploy.\"\n}"}}
+
+event: event
+data: {"runId":"r_8713f00693","seq":12,"at":1791953210664,"type":"tool_use","agent":"toolu_agent_check","data":{"key":"tool:toolu_sub_read","id":"toolu_sub_read","name":"Read","summary":"/tmp/fleet-claude-qdfI6q/fleet/repos/fleet-sandbox/deploy/preview.toml","detail":"{\n  \"file_path\": \"/tmp/fleet-claude-qdfI6q/fleet/repos/fleet-sandbox/deploy/preview.toml\"\n}"}}
+
+event: event
+data: {"runId":"r_8713f00693","seq":13,"at":1791953210665,"type":"tool_result","agent":"toolu_agent_check","data":{"key":"result:toolu_sub_read","toolUseId":"toolu_sub_read","isError":false,"text":"1\t[preview]\n2\tregion = \"iad\"\n3\treplicas = 1","length":43}}
+
+event: event
+data: {"runId":"r_8713f00693","seq":14,"at":1791953210666,"type":"assistant","agent":"toolu_agent_check","data":{"key":"msg_sub2:0","messageId":"msg_sub2","model":"claude-sonnet-5","text":"The preview config is complete: one replica in iad."}}
+
+event: event
+data: {"runId":"r_8713f00693","seq":15,"at":1791953210666,"type":"tool_result","agent":null,"data":{"key":"result:toolu_agent_check","toolUseId":"toolu_agent_check","isError":false,"text":"The preview config is complete: one replica in iad.\nagentId: a1b2c3d4e5f60718","length":77}}
+
+event: event
+data: {"runId":"r_8713f00693","seq":16,"at":1791953210666,"type":"tool_use","agent":null,"data":{"key":"tool:toolu_deploy","id":"toolu_deploy","name":"Bash","summary":"porter deploy fleet-sandbox --env preview","detail":"{\n  \"command\": \"porter deploy fleet-sandbox --env preview\",\n  \"description\": \"Deploy the preview\"\n}"}}
+
+event: event
+data: {"runId":"r_8713f00693","seq":17,"at":1791953210667,"type":"tool_result","agent":null,"data":{"key":"result:toolu_deploy","toolUseId":"toolu_deploy","isError":true,"text":"Permission to use Bash has been denied.","length":39}}
+
+event: event
+data: {"runId":"r_8713f00693","seq":18,"at":1791953210667,"type":"result","agent":null,"data":{"subtype":"success","isError":false,"sessionId":null,"costUsd":0.04,"costCumulative":true,"durationMs":8000,"turns":null,"input":0,"output":0,"cacheRead":0,"denied":["Bash"],"text":"I need permission to run the deploy.","errors":[],"apiErrorStatus":null,"terminalReason":null}}
+
