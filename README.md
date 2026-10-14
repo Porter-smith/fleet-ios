@@ -95,7 +95,7 @@ Open **https://porter-smith.github.io/fleet-ios/** in Safari on the iPhone and t
 
 1. `ci/asc.py` registers the bundle ID `dev.portersmith.fleet` and any devices in `IOS_DEVICE_UDIDS` through the App Store Connect API. It then reuses the ad hoc profile **Fleet Ad Hoc CI**, or remakes it when a device was added, the certificate changed, or it expires within 14 days. The profile covers every enabled iOS device on the team.
 2. It imports the Apple Distribution certificate into a throwaway keychain, archives with manual signing, and exports with `method: release-testing` (ad hoc).
-3. It checks the signature, then publishes `Fleet-<version>-<build>.ipa`, `manifest.plist` and `index.html` to GitHub Pages. Pages has a valid HTTPS certificate, which `itms-services` requires, so you don't need to trust Caddy's CA for this.
+3. It checks the signature, then publishes `Fleet-<version>-<build>.ipa`, `manifest-<build>.plist` (also copied to `manifest.plist`) and `index.html` to GitHub Pages. The install link carries the manifest URL percent-encoded, with no query strings anywhere: iOS answers a raw or query-string manifest URL with "Open in iTunes?" and then does nothing. Pages has a valid HTTPS certificate, which `itms-services` requires, so you don't need to trust Caddy's CA for this.
 
 ### What's public
 

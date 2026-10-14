@@ -194,7 +194,10 @@ jobs:
           SITE="$GITHUB_WORKSPACE/site"
           mkdir -p "$SITE"
           cp "$IPA" "$SITE/$NAME"
-          cat > "$SITE/manifest.plist" <<EOF
+          # Per-build manifest name for cache-busting: no query strings on the
+          # manifest or ipa URLs, which iOS rejects ("Open in iTunes?" then nothing).
+          MANIFEST="manifest-$BUILD_NUMBER.plist"
+          cat > "$SITE/$MANIFEST" <<EOF
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
           <plist version="1.0">
@@ -221,7 +224,10 @@ jobs:
           </dict>
           </plist>
           EOF
-          INSTALL="itms-services://?action=download-manifest&amp;url=$BASE/manifest.plist?b=$BUILD_NUMBER"
+          cp "$SITE/$MANIFEST" "$SITE/manifest.plist"   # stable URL for the latest build
+          # The manifest URL goes in percent-encoded; iOS ignores the link otherwise.
+          ENCODED="$(python3 -I -c 'import sys, urllib.parse; print(urllib.parse.quote(sys.argv[1], safe=""))' "$BASE/$MANIFEST")"
+          INSTALL="itms-services://?action=download-manifest&amp;url=$ENCODED"
           cat > "$SITE/index.html" <<EOF
           <!doctype html>
           <html lang="en">
