@@ -29,7 +29,7 @@ final class ThreadTests: XCTestCase {
 
         let spawn = try XCTUnwrap(rows.first { $0.kind == .spawn })
         XCTAssertEqual(spawn.agents.first?.name, "Check the preview config")
-        XCTAssertEqual(spawn.agents.first?.agentId, "a1b2c3d4e")
+        XCTAssertEqual(spawn.agents.first?.agentId, "a1b2c3d4e5f60718")
         XCTAssertEqual(spawn.agents.first?.pending, false)
 
         let tools = try XCTUnwrap(rows.first { $0.kind == .tools })
