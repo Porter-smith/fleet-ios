@@ -1,3 +1,4 @@
+import FleetKit
 import SwiftUI
 
 /// The logos of the harnesses, the same ones the web draws in HarnessIcon
