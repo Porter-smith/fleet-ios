@@ -23,6 +23,10 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: dev.portersmith.fleet
+        # Empty unless the ad hoc CI job passes FLEET_PROVISIONING_PROFILE. Set
+        # here, not on the xcodebuild command line, so it doesn't reach the
+        # FleetKit package targets (which reject provisioning profiles).
+        PROVISIONING_PROFILE_SPECIFIER: $(FLEET_PROVISIONING_PROFILE)
         TARGETED_DEVICE_FAMILY: "1,2"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor

@@ -41,6 +41,8 @@ Add `TEST_RUNNER_FLEET_URL=http://127.0.0.1:8793 TEST_RUNNER_FLEET_TOKEN=dev` to
 
 CI (`.github/workflows/ios.yml`) runs on GitHub's macOS runners in fleet-ios, on each push to main and on pull requests. It needs no secrets and no server. It uploads the screenshots as the `screenshots` artifact.
 
+A second workflow, `.github/workflows/adhoc.yml`, builds a signed ipa for your iPhone. See [Install on an iPhone](#install-on-an-iphone).
+
 ### Publishing to GitHub
 
 From agent-fleet, after committing changes to `ios/`:
@@ -82,10 +84,56 @@ If the certificate isn't trusted, the app says so when you pair. Plain `http://`
   - **Stop** ends the process.
   - **Restart** resumes the session as a new run.
 
-## Not yet: needs an Apple Developer account
+## Install on an iPhone
 
-CI builds for the simulator without signing. Installing on a real iPhone, TestFlight, push notifications (APNs) and Live Activities all need a paid Apple Developer Program membership, which you need to sign up for first. After that:
+Open **https://porter-smith.github.io/fleet-ios/** in Safari on the iPhone and tap **Install Fleet**. This works like Expo's internal distribution: an ad hoc signed build, installed from an `itms-services://` link. It installs only on iPhones registered on the Apple developer team (team `GDTA3U9KK4`).
 
-- Set a team and signing in `project.yml` (`DEVELOPMENT_TEAM`, an App ID for `dev.portersmith.fleet`).
-- Add a signing step to CI, with fastlane `match` or Xcode Cloud, for TestFlight uploads.
-- Add the push entitlement and a server-side APNs sender for "needs you" alerts.
+- The first time, iOS asks for **Developer Mode**: **Settings > Privacy & Security > Developer Mode**, then restart. iOS shows that switch only after you've tried to install an ad hoc app once.
+- To update, open the page and tap **Install** again. Each build has a higher `CFBundleVersion` (the workflow's run number), so the new one replaces the old and keeps the app's data and the Keychain token.
+
+`.github/workflows/adhoc.yml` makes the build on each push to main of fleet-ios, and on demand from **Actions > Ad hoc install > Run workflow**. It never runs on pull requests. Without the signing secrets it skips the build and still passes. Each run:
+
+1. `ci/asc.py` registers the bundle ID `dev.portersmith.fleet` and any devices in `IOS_DEVICE_UDIDS` through the App Store Connect API. It then reuses the ad hoc profile **Fleet Ad Hoc CI**, or remakes it when a device was added, the certificate changed, or it expires within 14 days. The profile covers every enabled iOS device on the team.
+2. It imports the Apple Distribution certificate into a throwaway keychain, archives with manual signing, and exports with `method: release-testing` (ad hoc).
+3. It checks the signature, then publishes `Fleet-<version>-<build>.ipa`, `manifest.plist` and `index.html` to GitHub Pages. Pages has a valid HTTPS certificate, which `itms-services` requires, so you don't need to trust Caddy's CA for this.
+
+### What's public
+
+The repo, the Pages site and its artifacts are public. Nothing secret goes in them. The signing keys stay in Actions secrets, they're used only on the macOS runner, and the runner deletes the keychain afterwards. Logs show counts, never UDIDs. Like any ad hoc ipa, though, the one on the page carries its provisioning profile. Anyone who downloads it can read the team ID, the name on the certificate (Porter Smith) and the **UDIDs of the registered devices**. Without a device being registered on your team, nobody can install the app, and a UDID alone gives no access to the phone.
+
+### One-time setup
+
+You don't need a Mac for any of this. It was done on 2026-10-14. Repeat it when the certificate expires (2027-10-14) or if you move to a new team.
+
+1. **API key.** Go to App Store Connect, then **Users and Access > Integrations > App Store Connect API > Team Keys**, and generate a key with the **Admin** role. Admin can create the distribution certificate. Each build afterwards only manages bundle IDs, devices and profiles, so you can swap in an **App Manager** key for `ASC_KEY_*`. If builds then fail with a 403, go back to Admin. Note the **Key ID** and the **Issuer ID** (above the keys table), and download the `.p8` file. Apple lets you download it only once.
+2. **Team ID.** Find it at developer.apple.com, under **Account > Membership details**. For this team it's `GDTA3U9KK4`.
+3. **iPhone UDID.** It's only needed if the phone isn't registered yet. Check under **Certificates, Identifiers & Profiles > Devices** on developer.apple.com: an iPhone added for Expo builds is already there. Without a Mac, you can get it in any of these ways:
+   - On Windows, plug the phone in, open iTunes or Apple Devices, and click the serial number until it shows the UDID.
+   - On Linux, plug the phone in and run `idevice_id -l` (libimobiledevice).
+   - On the phone, open a UDID site such as udid.tech in Safari and install its profile. That site sees the UDID.
+
+   Put it in the `IOS_DEVICE_UDIDS` secret (comma-separate several). Or add it on developer.apple.com. The next build includes it.
+4. **Certificate and secrets.** Run this on any Linux or macOS box with `openssl`, `python3` and an authenticated `gh`:
+
+   ```sh
+   export ASC_KEY_ID=... ASC_ISSUER_ID=... ASC_KEY_PATH=~/private/AuthKey_XXXX.p8 APPLE_TEAM_ID=GDTA3U9KK4
+   ci/setup-signing.sh ~/private/fleet-ios     # a 0700 folder outside any repo
+   ```
+
+   It makes an RSA key and CSR, creates an **Apple Distribution** certificate from them through the API, and packs both into `dist.p12` in that folder. Then it sets these Actions secrets on fleet-ios:
+
+   | Secret | What |
+   | --- | --- |
+   | `APPLE_TEAM_ID` | Team ID |
+   | `ASC_KEY_ID`, `ASC_ISSUER_ID` | API key ID and issuer ID |
+   | `ASC_KEY_P8` | Contents of the `.p8` |
+   | `DIST_CERT_P12`, `DIST_CERT_PASSWORD` | The distribution certificate and key (base64 p12), and its password |
+   | `IOS_DEVICE_UDIDS` | Optional: devices to register |
+
+   Keep that folder. It holds the certificate's only private key. If you lose it, run the script again with an empty folder. That makes a new certificate (a team can hold 3 distribution certificates). Revoking a certificate stops every app signed with it from opening.
+5. **Pages.** Under the repo's **Settings > Pages**, set the source to **GitHub Actions** (already done).
+
+## Still to do
+
+- TestFlight or the App Store: an App Store export plus an upload step, using the same API key.
+- Push notifications (APNs) for "needs you" alerts: the push entitlement and a server-side sender. Live Activities come after that.
