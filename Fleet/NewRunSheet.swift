@@ -148,15 +148,15 @@ struct NewRunSheet: View {
             HStack(spacing: 2) {
                 folderMenu
                 machineMenu
-                Text("Starts a Fleet run")
-                    .font(Theme.caption)
-                    .foregroundStyle(Theme.attn)
-                    .lineLimit(1)
-                    .padding(.leading, 2)
                 Spacer(minLength: 2)
                 if ChatThread.takesPermissionMode(harness) { permissionMenu }
             }
             .padding(.horizontal, 4)
+            Text("Starts a Fleet run")
+                .font(Theme.caption)
+                .foregroundStyle(Theme.attn)
+                .lineLimit(1)
+                .padding(.horizontal, 10)
         }
         .onAppear { focused = true }
     }
