@@ -67,6 +67,9 @@ public enum Demo {
     /// The run whose Agent call has a nested subagent, and the one mid-turn.
     static let deployRun = "r_8713f00693"
     static let busyRun = "r_f11275d79e"
+    /// The run waiting on an AskUserQuestion, and the one holding a Bash permission prompt.
+    static let questionRun = "r_413fd7fdf0"
+    static let permissionRun = "r_a3d0538edb"
 
     private static var notFound: Reply {
         Reply(status: 404, body: Data(#"{"error":"Not part of the demo."}"#.utf8))
@@ -108,7 +111,7 @@ public enum Demo {
 
     /// GET /api/runs/:id/stream: the captured stream, held open like the server's.
     private static func stream(_ id: String) -> Reply {
-        let name = id == deployRun ? "stream_subagent" : id == busyRun ? "stream_live" : nil
+        let name = [deployRun: "stream_subagent", busyRun: "stream_live", questionRun: "stream_question", permissionRun: "stream_permission"][id]
         if let name, let data = fixture(name, "txt"), let text = String(data: data, encoding: .utf8) {
             let lines = text.split(separator: "\n", omittingEmptySubsequences: false).map { line -> String in
                 guard line.hasPrefix("data: ") else { return String(line) }

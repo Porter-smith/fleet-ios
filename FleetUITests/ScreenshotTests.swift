@@ -1,7 +1,8 @@
 import XCTest
 
-/// Walks the app and saves screenshots: the runs list, a chat with a nested
-/// subagent, the composer and its actions, and the new-run sheet.
+/// Walks the app and saves screenshots: the threads list, a chat with a subagent
+/// and its transcript, a held permission prompt, a question, the composer mid-turn,
+/// and the new-chat composer.
 ///
 /// By default the app runs in demo mode (`-FleetDemo`, the bundled fixtures), so
 /// no server is needed. To walk a Fleet dev server (`bun scripts/dev-fleet.ts`)
@@ -30,50 +31,52 @@ final class ScreenshotTests: XCTestCase {
     }
 
     func testScreenshotWalk() throws {
-        // 1. Runs list, grouped by machine.
+        // 1. Threads: running and waiting first, then the rest by machine.
         let deploy = element("run:Deploy the fleet-sandbox preview")
         XCTAssertTrue(deploy.waitForExistence(timeout: 30), "the runs should load")
         sleep(1)
-        snap("01-runs-list")
+        snap("01-threads")
+        let plus = element("newRun.open")
 
-        // 2. A chat whose Agent call is opened onto its subagent's work.
+        // 2. A chat whose Agent call draws as a subagent row, then that subagent's transcript.
         deploy.tap()
         let subagent = element("subagent.toolu_agent_check")
         XCTAssertTrue(subagent.waitForExistence(timeout: 20), "the Agent call should draw as a subagent row")
         reveal(subagent)
-        subagent.tap()
         sleep(1)
-        snap("02-chat-subagent")
-        back()
+        snap("02-chat")
+        subagent.tap()
+        XCTAssertTrue(element("agent.transcript").waitForExistence(timeout: 20), "the subagent's transcript should open")
+        sleep(1)
+        snap("03-subagent")
+        let done = element("sheet.done")
+        if done.waitForExistence(timeout: 5) { done.tap() }
+        sleep(1)
+        back(until: plus)
 
-        // 3. The composer on a run mid-turn: Queue, Send now, Interrupt.
-        let busy = element("run:Fix dropped queue messages under load")
-        XCTAssertTrue(busy.waitForExistence(timeout: 10))
-        busy.tap()
+        // 3. A held permission prompt: Allow once, Allow this tool, Deny.
+        open("run:Run the fleet-sandbox migrations", until: "permission")
+        snap("04-permission")
+        back(until: plus)
+
+        // 4. A question the agent asks, with its options.
+        open("run:Should the queue table use Postgres or SQLite?", until: "question")
+        snap("05-question")
+        back(until: plus)
+
+        // 5. The composer on a run mid-turn: Queue and Send now (the main one), and Stop.
+        open("run:Fix dropped queue messages under load", until: "composer.field")
         let field = element("composer.field")
-        XCTAssertTrue(field.waitForExistence(timeout: 20))
         field.tap()
         if app.keyboards.firstMatch.waitForExistence(timeout: 5) {
             field.typeText("Also cover the retry path when the socket drops")
         }
         sleep(1)
-        snap("03-composer")
-
-        // 4. The run actions menu, each with its reason.
-        let more = element("composer.more")
-        XCTAssertTrue(more.waitForExistence(timeout: 5))
-        more.tap()
-        sleep(1)
-        snap("04-composer-actions")
-        // Close the menu with a tap to its right (the menu covers the left of the
-        // screen; a tap there would pick an action), then go back to the list.
-        app.coordinate(withNormalizedOffset: CGVector(dx: 0.92, dy: 0.45)).tap()
-        sleep(1)
-        let plus = element("newRun.open")
+        snap("06-composer")
         back(until: plus)
 
-        // 5. The new-run sheet.
-        XCTAssertTrue(plus.waitForExistence(timeout: 10), "back should reach the runs list")
+        // 6. A new chat: the hero composer.
+        XCTAssertTrue(plus.waitForExistence(timeout: 10), "back should reach the threads list")
         plus.tap()
         let prompt = element("newRun.prompt")
         XCTAssertTrue(prompt.waitForExistence(timeout: 20), "machines with harnesses should load")
@@ -82,7 +85,16 @@ final class ScreenshotTests: XCTestCase {
             prompt.typeText("Add a health check to the sandbox deploy")
         }
         sleep(1)
-        snap("05-new-run")
+        snap("07-new-chat")
+    }
+
+    /// Opens a thread from the list and waits for an element of its chat.
+    private func open(_ row: String, until id: String) {
+        let link = element(row)
+        XCTAssertTrue(link.waitForExistence(timeout: 10), "\(row) should be listed")
+        link.tap()
+        XCTAssertTrue(element(id).waitForExistence(timeout: 20), "\(id) should show")
+        sleep(1)
     }
 
     // ---- helpers

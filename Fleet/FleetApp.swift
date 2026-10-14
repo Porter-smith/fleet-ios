@@ -15,6 +15,8 @@ struct FleetApp: App {
 
 struct RootView: View {
     @Environment(AppModel.self) private var model
+    /// Dark by default, like the web chat.
+    @AppStorage("appearance") private var appearance = Appearance.dark.rawValue
 
     var body: some View {
         Group {
@@ -25,6 +27,7 @@ struct RootView: View {
                 PairingView()
             }
         }
+        .preferredColorScheme((Appearance(rawValue: appearance) ?? .dark).scheme)
         .task(id: model.pairing) { await model.loadActor() }
     }
 }
@@ -110,10 +113,20 @@ struct PairingView: View {
 struct SettingsView: View {
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
+    @AppStorage("appearance") private var appearance = Appearance.dark.rawValue
 
     var body: some View {
         NavigationStack {
             List {
+                Section("Appearance") {
+                    Picker("Theme", selection: $appearance) {
+                        ForEach(Appearance.allCases) { option in
+                            Text(option.label).tag(option.rawValue)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .accessibilityIdentifier("settings.appearance")
+                }
                 Section("Server") {
                     LabeledContent("URL", value: model.serverURL)
                 }

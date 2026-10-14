@@ -108,10 +108,17 @@ public struct FleetClient: Sendable {
     public func stop(_ id: String) async throws -> Run { try await (post("/api/runs/\(id)/stop", body: [String: String]()) as RunResponse).run }
     public func restart(_ id: String) async throws -> Run { try await (post("/api/runs/\(id)/restart", body: [String: String]()) as RunResponse).run }
 
-    public func respond(_ id: String, decision: PermissionDecision, message: String? = nil) async throws -> Run {
+    /// Answers the run's held permission prompt. `answer` answers a held AskUserQuestion.
+    public func respond(_ id: String, decision: PermissionDecision, message: String? = nil, answer: String? = nil) async throws -> Run {
+        try await (post("/api/runs/\(id)/respond", body: Self.respondBody(decision: decision, message: message, answer: answer)) as RunResponse).run
+    }
+
+    /// The respond body, as the web sends it: `{decision, message?, answer?}`.
+    public static func respondBody(decision: PermissionDecision, message: String? = nil, answer: String? = nil) -> [String: String] {
         var body = ["decision": decision.rawValue]
         if let message, !message.isEmpty { body["message"] = message }
-        return try await (post("/api/runs/\(id)/respond", body: body) as RunResponse).run
+        if let answer, !answer.isEmpty { body["answer"] = answer }
+        return body
     }
 
     // ---- the live stream

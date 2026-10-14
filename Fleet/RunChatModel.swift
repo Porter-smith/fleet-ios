@@ -12,18 +12,29 @@ final class RunChatModel {
         case retrying(String)
     }
 
+    /// A message typed here, shown until the run's own copy of it arrives (the web's `local` items).
+    struct Local: Identifiable, Equatable {
+        let id = UUID()
+        let text: String
+        var state: String // "sending" or "queued"
+    }
+
     let client: FleetClient
     let runId: String
     private(set) var run: Run?
     private(set) var caps: HarnessCapabilities?
-    private(set) var items: [ChatItem] = []
+    private(set) var machine: Machine?
+    /// The chat's rows, as the web's `threadItems` draws them.
+    private(set) var thread: [ThreadItem] = []
     private(set) var firstSeq: Int?
     private(set) var agents: [SessionAgent] = []
     private(set) var connection: Connection = .connecting
     private(set) var loadingEarlier = false
-    /// Messages the server queued for the end of the turn (it reports only how many).
-    private(set) var queuedTexts: [String] = []
-    private(set) var busy = false
+    private(set) var locals: [Local] = []
+    /// The action in flight: "send", "respond", "interrupt", "stop" or "restart".
+    private(set) var busy: String?
+    /// The decision just sent for the held prompt, so its card shows a spinner on that button.
+    private(set) var sentDecision: PermissionDecision?
     var error: String?
 
     @ObservationIgnored private var chat = ChatState()
@@ -38,14 +49,53 @@ final class RunChatModel {
     var controls: Controls? { run.map { Controls(run: $0, caps: caps) } }
     var canLoadEarlier: Bool { (firstSeq ?? 0) > 1 }
     var runningAgents: Int { agents.filter(\.isRunning).count }
+    var isBusy: Bool { busy != nil }
 
-    /// The main button. While a turn is open it queues (the message waits for the
-    /// turn to end); "Send now" pushes into the live turn where the harness can.
-    var primary: (mode: String, control: Control, label: String)? {
-        guard let run, let controls else { return nil }
-        if run.turnOpen && controls.queue.enabled { return ("queue", controls.queue, "Queue") }
-        return controls.primary
+    /// A held permission prompt keeps the turn open, but the run is really waiting on you, not working.
+    var working: Bool {
+        guard let run, !run.isEnded, run.pendingPermission == nil else { return false }
+        return run.status == .running || run.status == .starting || run.turnOpen
     }
+
+    /// Whether the last row is text still being written (then "Working..." hides).
+    var streaming: Bool { thread.last?.streaming == true }
+
+    /// The main button: Send now when the harness takes the message now, else Queue.
+    var primary: (mode: String, control: Control, label: String)? { controls?.primary }
+
+    var title: String {
+        if let title = run?.title, !title.isEmpty, !title.hasPrefix("Attached session ") { return title }
+        if let first = thread.first(where: { $0.kind == .user })?.text.split(separator: "\n").first { return String(first.prefix(120)) }
+        return run?.title ?? runId
+    }
+
+    /// The composer's state line, worded as the web words it.
+    var hint: String? {
+        guard let run, let controls else { return nil }
+        if let machine, !machine.isReachable { return "\(machine.name) is offline · sending fails until it's back" }
+        if working && run.turnOpen && run.queued > 0 && controls.queue.enabled {
+            return "\(Format.queuedText(run.queued)) waiting · new messages go after \(run.queued == 1 ? "it" : "them") when the turn ends"
+        }
+        if working && run.turnOpen && !controls.send.enabled && controls.queue.enabled { return "Messages queue until the turn ends" }
+        if working && run.turnOpen && controls.send.enabled {
+            return run.harness == "claude" ? "Send now: Claude Code reads it at its next tool step, so a long tool call delays it" : "Send now: \(Format.harnessName(run.harness)) takes it mid-turn"
+        }
+        return nil
+    }
+
+    /// Why the composer can't send at all, shown in place of its placeholder.
+    var disabled: String? {
+        guard let run, let controls else { return nil }
+        if run.isEnded {
+            if controls.restart.enabled && run.sessionId != nil && caps?.resume != false { return "This run has ended. Restart it to go on." }
+            if run.sessionId == nil { return "This run has ended without a session to resume." }
+            return "This run has ended and \(Format.harnessName(run.harness)) can't resume it."
+        }
+        if !controls.send.enabled && !controls.queue.enabled { return controls.send.reason }
+        return nil
+    }
+
+    var provision: [String] { run.map { ChatThread.provision(run: $0, machineName: machine?.name) } ?? [] }
 
     // ---- the stream
 
@@ -81,6 +131,7 @@ final class RunChatModel {
             let detail = try await client.run(runId)
             run = detail.run
             caps = detail.capabilities
+            if let machines = try? await client.machines() { machine = machines.first { $0.id == detail.run.machineId } }
             await refreshAgents(force: true)
         } catch {
             self.error = error.localizedDescription
@@ -91,13 +142,16 @@ final class RunChatModel {
         switch message {
         case .run(let fresh):
             let sessionChanged = fresh.sessionId != run?.sessionId
-            run = fresh
-            if fresh.queued == 0 { queuedTexts.removeAll() }
-            else if queuedTexts.count > fresh.queued { queuedTexts.removeFirst(queuedTexts.count - fresh.queued) }
+            take(fresh)
             if sessionChanged { Task { await refreshAgents(force: true) } }
         case .event(let event):
+            if event.type == "user", event.agent == nil, let text = event.data.string("text") {
+                // The run's own copy of a message typed here replaces it.
+                let said = text.trimmingCharacters(in: .whitespacesAndNewlines)
+                if let echo = locals.firstIndex(where: { $0.text == said }) { locals.remove(at: echo) }
+            }
             if chat.apply(event) { scheduleRebuild() }
-            if event.type == "tool_use", event.data.string("name").map({ ["Agent", "Task"].contains($0) }) == true {
+            if event.type == "tool_use", event.data.string("name").map({ ChatThread.isAgent($0) }) == true {
                 Task { await refreshAgents(force: true) }
             }
         case .delta(let delta):
@@ -106,6 +160,14 @@ final class RunChatModel {
         case .ping:
             Task { await refreshAgents(force: false) }
         }
+    }
+
+    private func take(_ fresh: Run) {
+        let before = run?.pendingPermission?.requestId
+        run = fresh
+        if fresh.pendingPermission?.requestId != before { sentDecision = nil }
+        if fresh.isEnded { locals.removeAll { $0.state == "queued" } }
+        scheduleRebuild()
     }
 
     /// Coalesces a burst of events (the replay, fast deltas) into one rebuild.
@@ -120,7 +182,7 @@ final class RunChatModel {
     }
 
     private func rebuild() {
-        items = chat.items()
+        thread = ChatThread.items(events: chat.events, partials: chat.partials, pendingPermission: run?.pendingPermission)
         firstSeq = chat.firstSeq
     }
 
@@ -146,41 +208,69 @@ final class RunChatModel {
         if let agents = try? await client.agents(sessionId: sessionId, machineId: run.machineId) { self.agents = agents }
     }
 
+    func agent(for spawned: SpawnedAgent) -> SessionAgent? {
+        agents.first { $0.toolUseId == spawned.toolUseId } ?? spawned.agentId.flatMap { id in agents.first { $0.id == id } }
+    }
+
     // ---- actions
 
+    /// Sends a message: Send now ("auto") when the harness takes it now, else Queue.
     @discardableResult
-    func send(_ text: String, mode: String) async -> Bool {
+    func send(_ text: String, mode: String? = nil) async -> Bool {
         let text = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty, !busy else { return false }
-        busy = true
-        defer { busy = false }
+        guard !text.isEmpty, busy == nil else { return false }
+        let mode = mode ?? (controls?.send.enabled == true ? "auto" : "queue")
+        busy = "send"
+        defer { busy = nil }
+        let local = Local(text: text, state: "sending")
+        locals.append(local)
         do {
             let response = try await client.send(runId, text: text, mode: mode)
-            run = response.run
-            if response.queued == true { queuedTexts.append(text) }
+            take(response.run)
+            if response.queued == true, let at = locals.firstIndex(where: { $0.id == local.id }) { locals[at].state = "queued" }
             error = nil
             return true
         } catch {
+            locals.removeAll { $0.id == local.id }
             self.error = error.localizedDescription
             return false
         }
     }
 
-    func interrupt() async { await act { try await $0.interrupt($1) } }
-    func stop() async { await act { try await $0.stop($1) } }
-    func respond(_ decision: PermissionDecision) async { await act { try await $0.respond($1, decision: decision) } }
+    private var asking: Bool { run?.pendingPermission.map { ChatThread.isAsk($0.tool) } == true }
+
+    /// Whether the question card can take an answer: a held prompt, or a reply the run can take.
+    var canAnswer: Bool { asking || (disabled == nil && !working) }
+
+    /// The question card's answer: the held AskUserQuestion prompt takes it, else it goes as a reply.
+    func answer(_ text: String) async {
+        if asking {
+            await respond(.allowOnce, answer: text)
+        } else {
+            await send(text)
+        }
+    }
+
+    func interrupt() async { await act("interrupt") { try await $0.interrupt($1) } }
+    func stop() async { await act("stop") { try await $0.stop($1) } }
+
+    func respond(_ decision: PermissionDecision, message: String? = nil, answer: String? = nil) async {
+        sentDecision = decision
+        let done = await act("respond") { try await $0.respond($1, decision: decision, message: message, answer: answer) }
+        if done == nil { sentDecision = nil }
+    }
 
     /// Starts a new run that resumes this session; returns it so the screen can open it.
-    func restart() async -> Run? { await act { try await $0.restart($1) } }
+    func restart() async -> Run? { await act("restart") { try await $0.restart($1) } }
 
     @discardableResult
-    private func act(_ action: @escaping @Sendable (FleetClient, String) async throws -> Run) async -> Run? {
-        guard !busy else { return nil }
-        busy = true
-        defer { busy = false }
+    private func act(_ name: String, _ action: @escaping @Sendable (FleetClient, String) async throws -> Run) async -> Run? {
+        guard busy == nil else { return nil }
+        busy = name
+        defer { busy = nil }
         do {
             let fresh = try await action(client, runId)
-            if fresh.id == runId { run = fresh }
+            if fresh.id == runId { take(fresh) }
             error = nil
             return fresh
         } catch {
