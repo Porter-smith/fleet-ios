@@ -138,7 +138,7 @@ struct ComposerView: View {
             }
         } label: {
             HStack(spacing: 5) {
-                if let run = model.run { HarnessMark(harness: run.harness, size: 14) }
+                if let run = model.run { HarnessIcon(harness: run.harness, size: 14) }
                 Text(modelText)
                     .lineLimit(1)
                 Image(systemName: "chevron.down").font(.system(size: 9, weight: .semibold)).foregroundStyle(Theme.muted)

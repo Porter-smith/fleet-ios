@@ -205,7 +205,7 @@ struct NewRunSheet: View {
             }
         } label: {
             HStack(spacing: 5) {
-                HarnessMark(harness: harness, size: 14)
+                HarnessIcon(harness: harness, size: 14)
                 Text(modelText).lineLimit(1)
                 Image(systemName: "chevron.down").font(.system(size: 9, weight: .semibold)).foregroundStyle(Theme.muted)
             }

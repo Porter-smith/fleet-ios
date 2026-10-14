@@ -211,19 +211,3 @@ struct OptionChip: View {
         .contentShape(Rectangle())
     }
 }
-
-/// The harness's mark, as a letter in a rounded square (the web draws each provider's logo).
-struct HarnessMark: View {
-    let harness: String
-    var size: CGFloat = 16
-
-    var body: some View {
-        let letter = harness == "claude" ? "C" : harness == "codex" ? "X" : String(harness.prefix(1)).uppercased()
-        Text(letter)
-            .font(.system(size: size * 0.62, weight: .bold, design: .rounded))
-            .foregroundStyle(Theme.canvas)
-            .frame(width: size, height: size)
-            .background(harness == "claude" ? Color(UIColor(hex: 0xD97757)) : Theme.ink2, in: RoundedRectangle(cornerRadius: size * 0.28, style: .continuous))
-            .accessibilityLabel("Harness: \(Format.harnessName(harness))")
-    }
-}
